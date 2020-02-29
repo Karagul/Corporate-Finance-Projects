@@ -1,0 +1,99 @@
+---
+title: "Financial Decision Making: Computer Assignment 3: Earning Momentum and Valuation"
+author: "YiTao Hu"
+date: "28/01/2020"
+output: pdf_document
+---
+## Executive Summary 
+
+To study the relationship between valuation metrics and mid-term earning momentum effects, I calculated the earning to price ratios in fiscal year ended in December 2013 and the mean net income percentage changes of previous three years across 2,638 stocks, from which I tried to discover any correlation or causality through a scatterplot,histograms, and regression analysis. The histograms show that although both of the distributions of E/P ratios and three-year mean earning growth rates are negatively skewed, and surprisingly, the scatterplot displays that firms with the same E/P ratio distribute almost randomly amongst various levels of 3-year mean earning growth rate. This was further confirmed in the regression analysis with insignificant slope coefficient. From these results, I concluded that past mid-term earning momentum has almost no correlation and predictive power of the future earning-based valuation metrics. 
+
+##Assumptions and Methodologies
+
+For this particular study, I collected basic Earnings per Share, Net income, and fiscal year closed prices for all stocks from the CRSP database. I choose basic EPS (excluding extraordinary items) mainly because management option compensations are not traded in the makret, and extraordinary items are not representative of the firms long-term profitability. Since my study is to test the predictive power of earning momentum, the stock price was chosen at the date of fiscial year end rather than the average stock price of the year to keep consistency with the timing of financial reports.
+
+With earnings and price data for the year 2013, I calculated the earning-to-price using the following formula:
+$$E/P_{2013}=Earning_{2013}/Price_{2013end}$$
+
+Then, I computed arithmetic three-year mean of earning growth rate with net income data using the following formula:
+
+$$NIGrowth_{3y}=\frac{1}{3}[\frac{(NI_{2011}-NI_{2010})}{NI_{2010}}+\frac{(NI_{2012}-NI_{2011})}{NI_{2011}}+\frac{(NI_{2013}-NI_{2012})}{NI_{2012}}]$$
+
+Finally, to detect any correlation between these two series, I plotted the marginal distribution of these two series in histograms and a scatterplot of 2013 E/P ratios over Earning Momentum(3-year mean earning growth rate). To avoid distorting the graph by outliers, I also dropped all observations in the first 10 and last 10 percentile. To test the relationship statistically, I also performed an OLS linear regression analysis by regressing 2013 E/P ratios on lagged 3-year earning growth rates. 
+
+##Results and Interpretations
+
+From the histograms, we observe that both the NI growth and E/P ratios are negatively skewed, while the the distriburion of E/P ratios look more normal. This observation is to some extend intuitive because very few public companies can still be traded and not delisted after incurring large losses for three consecuitive years, and thus we see a long tail on the negative side. From the scatterplot, we see that there is almost no correlation between past earning momentum and E/P ratio, as the conditional distributions of these two variables are almost equivalent to their marginal distributions. This observation was confirmed by the output of regressional analysis, where the slope coefficient of E/P ratio on earnings momentum is not statistically significant (has a p value of 0.945) and the regression R square is close to zero. From these observations, I concluded that past average earning growth alone has no predictive power of E/P ratio other other earning-based valuation multiples. 
+
+There are two sensible interpretations for this result. 
+
+The first one is the market efficiency hypothesis; because the market estimates the firms' eanrings accurately and adjusts price levels swiftly, all past earning information or other fundamentals have no predictive power of future relative price level (how much investor need to pay for one dollar earnings). Under such assumption, E/P ratios are baisically white noise. 
+
+The second possible interpretation is that although past earning momentum has some casual relation with E/P ratio, it is conditional on other factors such as future growth potential of the firms. firms can have weak earning momentum but low E/P ratio (which means investors have a high valuation) under two circumstances. These firm are indeed unprofitable and the investors overvalued. Alternatively, these firms can still be at their early stage, and thus incur large long-term investment such as R&D, which are required to report as expenses under current account standard. These firms have negative accounting earnings but still have very strong long-term growth potential, and therefore, investors have a high valuation of them. 
+
+In conclusion, I would argue that past mid-term earning momentum alone is not sufficient to explain the change in E/P ratios or relative valuation of the public firms. Further studies using multi-variant regressions with other fundamental variables may be valuable to discover the true casualty of earning momentum and E/P ratios.
+
+## Plots and Code
+
+```{r message=FALSE, warning=FALSE}
+#import data and libraries
+library(readr)
+library(reshape2)
+library(dplyr)
+HW3Data <- read_csv("HW3Data.csv"
+                    , col_types = cols(consol = col_skip(), 
+                       costat = col_skip(), curcd = col_skip(), 
+        datadate = col_skip(), datafmt = col_skip(), 
+        fyr = col_skip(), gvkey = col_skip(), 
+        indfmt = col_skip(), popsrc = col_skip()))
+#compute E/P ratio
+HW3Data$E_P=HW3Data$epspx/HW3Data$prcc_f
+#grab 2013 E/P ratio
+E_P_2013=HW3Data[HW3Data$fyear==2013,c(2,6)]
+#drop all NAs and 0's
+E_P_2013=na.omit(E_P_2013)
+E_P_2013=filter(E_P_2013,E_P!=0)
+#decast to get the annual net income for each firm
+NI_data=dcast(data = HW3Data,formula = tic~fyear,value.var = 'ni',fun.aggregate = sum)
+#drop all NAs and 0's 
+NI_data=na.omit(NI_data)
+NI_data=filter(NI_data,NI_data$`2010`!=0,NI_data$`2011`!=0,NI_data$`2012`!=0,NI_data$`2013`!=0)
+#compute Y-O-Y earning change
+NI_chg=(NI_data[,3:5]-NI_data[,2:4])/NI_data[,2:4]
+NI_chg$mean_3y=rowMeans(NI_chg)
+NI_chg$tic=NI_data$tic
+#merge two dataset on tickers
+E_P_Over_NI_change=merge(E_P_2013,NI_chg[,4:5],by='tic')
+# plot the E/P ratio over the mean change in Net Income
+plot(x = E_P_Over_NI_change$mean_3y,
+     xlim = as.vector(quantile(E_P_Over_NI_change$mean_3y,probs = c(0.1,0.9))),
+     xlab = 'Lagged 3-year mean % change in Net Income',
+     y = E_P_Over_NI_change$E_P,
+     ylim = as.vector(quantile(E_P_Over_NI_change$E_P,probs = c(0.1,0.9))),
+     ylab = 'E/P ratio for the year 2013',
+     type='p',
+     main = 'Scatter plot of E/P ratio of 2013 over mid-term Earning Momentum')
+
+
+grid()
+```
+```{r}
+hist(E_P_Over_NI_change$E_P[E_P_Over_NI_change$E_P>quantile(E_P_Over_NI_change$E_P,
+                                                            probs = 0.1)&E_P_Over_NI_change$E_P<quantile(E_P_Over_NI_change$E_P,probs = 0.9)],
+     breaks = 100,
+     main='Distributions of past three year mean Earning Growth',xlab = 'Earning Growth Rate')
+```
+
+```{r}
+hist(E_P_Over_NI_change$mean_3y[E_P_Over_NI_change$mean_3y>quantile(E_P_Over_NI_change$mean_3y,
+                                                                    probs = 0.1)&E_P_Over_NI_change$mean_3y<quantile(E_P_Over_NI_change$mean_3y,
+                                                                                                                     probs = 0.9)],breaks = 100,
+     main = 'Distribution of 2013 E/P ratio',xlab = 'E/P Ratio')
+```
+The regression output of E/P ratio over lagged three year earning growth
+
+```{r}
+E_P_lag_rtn_model=lm(E_P_Over_NI_change$E_P~E_P_Over_NI_change$mean_3y)
+summary(E_P_lag_rtn_model)
+```
+
